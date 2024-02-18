@@ -67,6 +67,12 @@ export class UserService {
     return userByEmail;
   }
 
+  public async getUserById(id: number): Promise<UserEntity> {
+    return await this.userRepository.findOne({
+      where: { id },
+    });
+  }
+
   private generateJwt(user: UserEntity): string {
     return sign(
       {
@@ -79,7 +85,7 @@ export class UserService {
     );
   }
 
-  buildUserResponse(user: UserEntity): UserResponseInterface {
+  public buildUserResponse(user: UserEntity): UserResponseInterface {
     delete user.password;
     return {
       user: {
