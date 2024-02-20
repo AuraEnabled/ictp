@@ -1,7 +1,11 @@
 
   <h1>Test project</h1>
 
-Node.js v21.1.0<br/>
+Node.js v21.1.0<br/><br/>
+## Stack
+NestJS<br/>
+Postgres<br/>
+TypeORM<br/>
 
 ## Installation
 
