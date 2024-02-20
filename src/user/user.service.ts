@@ -9,6 +9,8 @@ import { UserResponseInterface } from '../auth/types/userResponse.interface';
 import { LoginUserDto } from '../auth/dto/loginUser.dto';
 import { compare } from 'bcrypt';
 import { Roles } from '../enums/roles.enum';
+import { UserType } from '../auth/types/user.type';
+import { UpdateUserDto } from './dto/updateUser.dto';
 
 @Injectable()
 export class UserService {
@@ -17,10 +19,6 @@ export class UserService {
     private readonly userRepository: Repository<UserEntity>,
     private readonly configService: ConfigService,
   ) {}
-
-  public async findAll(): Promise<UserEntity[]> {
-    return this.userRepository.find();
-  }
 
   public async createUser(createUserDto: CreateUserDto): Promise<UserEntity> {
     const errorResponse = {
@@ -97,6 +95,44 @@ export class UserService {
     }
 
     return userByEmail;
+  }
+
+  public async getUserWithSubordinates(user: UserEntity): Promise<UserType[]> {
+    const users: UserType[] = [];
+    users.push(user);
+    if (user.role === Roles.ADMINISTRATOR) {
+      const bosses = await this.userRepository.find({
+        where: { role: Roles.BOSS },
+        relations: ['subordinates'],
+      });
+      users.push(...bosses);
+    }
+    return users;
+  }
+
+  public async updateBossId(
+    currentUser: UserEntity,
+    updateUserDto: UpdateUserDto,
+  ): Promise<UserType> {
+    const isNewBossValid = await this.isBossIdValid(updateUserDto.newBossId);
+
+    if (!isNewBossValid) {
+      throw new HttpException(
+        'New boss is not valid',
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
+    }
+
+    for (const subordinate of currentUser.subordinates) {
+      if (subordinate.id === updateUserDto.userId) {
+        subordinate.bossId = updateUserDto.newBossId;
+        return await this.userRepository.save(subordinate);
+      }
+    }
+    throw new HttpException(
+      'You dont have rights for this operation',
+      HttpStatus.BAD_REQUEST,
+    );
   }
 
   public async getUserById(id: number): Promise<UserEntity> {
