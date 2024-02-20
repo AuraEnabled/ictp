@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { UserResponseInterface } from '../auth/types/userResponse.interface';
 import { LoginUserDto } from '../auth/dto/loginUser.dto';
 import { compare } from 'bcrypt';
+import { Roles } from '../enums/roles.enum';
 
 @Injectable()
 export class UserService {
@@ -22,16 +23,47 @@ export class UserService {
   }
 
   public async createUser(createUserDto: CreateUserDto): Promise<UserEntity> {
+    const errorResponse = {
+      errors: {},
+    };
+
     const userByEmail = await this.userRepository.findOne({
       where: { email: createUserDto.email },
-      select: ['id', 'firstname', 'lastname', 'email', 'password'],
     });
+    const isValidRole = Object.values(Roles).includes(
+      createUserDto.role as Roles,
+    );
+
+    if (!isValidRole) {
+      errorResponse.errors['role'] = 'does not exist';
+    }
 
     if (userByEmail) {
-      throw new HttpException(
-        'Email is taken',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
+      errorResponse.errors['email'] = 'is taken';
+    }
+
+    if (
+      (createUserDto.role === Roles.ADMINISTRATOR ||
+        createUserDto.role === Roles.BOSS) &&
+      createUserDto.bossId
+    ) {
+      errorResponse.errors['bossId'] = 'is not relevant to administrator/boss';
+    } else if (
+      createUserDto.role === Roles.REGULAR_USER &&
+      !createUserDto.bossId
+    ) {
+      errorResponse.errors['bossId'] = 'is required for regular user';
+    }
+
+    if (
+      createUserDto.bossId &&
+      !(await this.isBossIdValid(createUserDto.bossId))
+    ) {
+      errorResponse.errors['bossId'] = 'is not a valid boss';
+    }
+
+    if (Object.entries(errorResponse.errors).length > 0) {
+      throw new HttpException(errorResponse, HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     const newUser = new UserEntity();
@@ -70,7 +102,13 @@ export class UserService {
   public async getUserById(id: number): Promise<UserEntity> {
     return await this.userRepository.findOne({
       where: { id },
+      relations: ['subordinates'],
     });
+  }
+
+  public async isBossIdValid(id: number): Promise<boolean> {
+    const guessBoss = await this.getUserById(id);
+    return guessBoss?.role === Roles.BOSS;
   }
 
   private generateJwt(user: UserEntity): string {

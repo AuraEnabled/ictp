@@ -1,8 +1,17 @@
-import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { hash } from 'bcrypt';
 import * as process from 'process';
+import { Roles } from '../enums/roles.enum';
 
-@Entity({ name: 'users' })
+@Entity('users')
 export class UserEntity {
   @PrimaryGeneratedColumn()
   id: number;
@@ -16,8 +25,28 @@ export class UserEntity {
   @Column()
   email: string;
 
+  @Column()
+  bossId: number;
+
+  @Column({
+    type: 'enum',
+    enum: Roles,
+    default: Roles.REGULAR_USER,
+  })
+  role: Roles;
+
   @Column({ select: false })
   password: string;
+
+  @OneToMany(() => UserEntity, (subordinate) => subordinate.boss)
+  subordinates: UserEntity[];
+
+  @ManyToOne(() => UserEntity, (boss) => boss.subordinates)
+  @JoinColumn({
+    name: 'bossId',
+    referencedColumnName: 'id',
+  })
+  boss: UserEntity;
 
   @BeforeInsert()
   async hashPassword() {

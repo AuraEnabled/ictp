@@ -13,4 +13,9 @@ export class CreateUserDto {
 
   @IsNotEmpty()
   readonly password: string;
+
+  @IsNotEmpty()
+  readonly role: string;
+
+  readonly bossId: number;
 }
